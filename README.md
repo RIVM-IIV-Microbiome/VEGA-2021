@@ -1,5 +1,4 @@
-# VEGA-2021
-Codes and data for VEGA metagenomics study
+
 ### Specialized species-specific gut microbiome patterns in Dutch individuals with different long-term dietary habits   
 
 
@@ -8,7 +7,8 @@ Sudarshan A. Shetty<sup>1,2</sup> Paul B. Stege<sup>3</sup>, Joost Hordijk<sup>1
 
 
 <sup>1</sup> Center for Infectious Disease Control, National Institute for Public Health and the Environment, The Netherlands.   
-<sup>2</sup> Department of Medical Microbiology and Infection prevention, Virology and Immunology research Group, University Medical Center Groningen, Groningen, Netherlands   
+<sup>2</sup> Department of Medical Microbiology and Infection prevention, Virology and Immunology research Group, University Medical Center Groningen, Groningen, Netherlands.     
+<sup>3</sup> Department of Medical Microbiology, UMC Utrecht, The Netherlands.  
 <sup>*</sup> Corresponding author: Susana Fuentes; susana.fuentes[@]rivm[dot]nl    
 
 ---   
