@@ -1,0 +1,111 @@
+---
+title: "Metagenomics Analysis VEGA project"
+subtitle: "Calculate Gut Metabolic Modules"
+author: "Sudarshan"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document: 
+    toc: yes
+    toc_depth: 2
+    toc_float: true
+    code_folding: hide  
+editor_options: 
+  chunk_output_type: console
+---
+
+# Introduction  
+
+We use the KEGG ortholog abundances from each of the samples and calculate presence and abundances of gut metabolic modules.  
+
+## Libraries  
+```{r}
+library(omixerRpm)
+library(data.table)
+library(dplyr)
+```
+
+## Read data   
+
+```{r}
+dat.main <- read.table("data/tab/ko_sp_for_gmm.txt", header=T, sep="\t")
+dat.main$organism <- sub('.*\\.', '', dat.main$organism)
+dat.main$organism <- sub('s__', '', dat.main$organism) 
+head(dat.main)
+dat.main <- dat.main %>% select(-id)
+```
+
+# Calculate GMMs   
+
+We created a custom GMM file from previous study currently. 
+
+```{r}
+
+# Run the custom module mapping on the loaded table.
+db <- ModuleDB(directory = "data/moduleDB/", modules = "gmm_expanded.txt", module.names.file="gmm_expanded_list.txt")
+
+#,out.dir = "../data/tab/myfile"
+mods <- rpm(dat.main, minimum.coverage=-1, 
+            annotation =2,threads=6,
+            module.db=db)
+saveRDS(mods, "data/gmm.sp.mods.rds")
+#Coverage cutoff: 0.5555555
+```
+
+## Map levels  
+
+```{r}
+gmm.abund <- mods@abundance
+mods <- readRDS( "data/gmm.sp.mods.rds")
+
+modsDF <- cbind(mods@annotation, slot(mods, "abundance"))
+
+#modsDF
+curatedGMM_names <- read.table("data/tab/module_classification.txt", header=T, sep="\t")
+#head(curatedGMM_names)
+
+fil_list <- modsDF$Module
+curatedGMM_names_filt <- filter(curatedGMM_names, curatedGMM_names$module_id %in% fil_list)
+
+#dim(curatedGMM_names_filt)
+#curatedGMM_names_filt$V1
+colnames(curatedGMM_names_filt) <- c("Module", "Names", "Level_1", "Level_2", "Level_3", "note")
+
+module_df <- merge(modsDF, curatedGMM_names_filt, by.x="Module")
+
+mods_sum2 <- modsDF %>% group_by(Module) %>% summarize_if(is.numeric,sum,na.rm = TRUE)
+
+mods_sum <- as.data.frame(mods_sum2)
+rownames(mods_sum) <- mods_sum$Module
+saveRDS(mods_sum, "data/gmm.mod.sum.rds")
+
+```
+
+## Save Taxa-Function data   
+```{r}
+meta_tab <- as.data.frame(fread("data/metagenome_vega_sample_selection.txt",
+                                header = T, sep = "\t", 
+                                stringsAsFactors = F))
+
+meta_tab$MG_Sample_ID <- gsub("mg_Vega_", "VEGA", meta_tab$MG_Sample_ID)
+rownames(meta_tab) <- meta_tab$MG_Sample_ID
+meta_tab <- meta_tab[, -1]
+colnames(meta_tab)[1] <- "unqiueID"
+meta_tab$sampleID <- rownames(meta_tab)
+
+head(module_df)
+
+gmm_nm <-  module_df 
+
+gmm_tx <- reshape2::melt(gmm_nm) %>% 
+  left_join(meta_tab, by=c("variable"="sampleID"))
+
+saveRDS(gmm_tx, "data/rds/gmm_tx.rds")
+
+```
+
+
+```{r}
+sessionInfo()
+```
+
+

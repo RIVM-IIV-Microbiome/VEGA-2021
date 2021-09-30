@@ -1,0 +1,71 @@
+# Install R version >3.4.1 and RStudioversion > 1.0.153
+
+# Copy from here
+
+setup_microbiome_analysis <- function(){
+  
+  .packages = c("ape", 
+                "gridExtra", 
+                "picante", 
+                "data.table", 
+                "RColorBrewer", 
+                "DT", 
+                "data.table",
+                "reshape2", 
+                "magrittr", 
+                "markdown",
+                "tidyverse",
+                "ggpubr", 
+                "tibble", 
+                "pheatmap", 
+                "viridis", 
+                "devtools", 
+                "rmdformats",
+                "intergraph",
+                "network",
+                "igraph",
+                "ggplot2", 
+                "gridExtra", 
+                "knitr", 
+                "vegan", 
+                "plyr", 
+                "dplyr",
+                "ggrepel", 
+                "ade4", 
+                "rmarkdown",
+                "formatR",
+                "caTools",
+                "GGally")
+  
+  .bioc_packages <- c("phyloseq",
+                      "microbiome", 
+                      "phangorn", 
+                      "genefilter",
+                      "pathview")
+  if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+  
+  # Install CRAN packages (if not already installed)
+  .inst <- .packages %in% installed.packages()
+  if(length(.packages[!.inst]) > 0) install.packages(.packages[!.inst])
+  
+  .inst <- .bioc_packages %in% installed.packages()
+  if(any(!.inst)) {
+    BiocManager::install(.bioc_packages[!.inst])
+  }
+  
+  
+  if (!("microbiomeutilities"  %in% installed.packages())) {
+    devtools::install_github("microsud/microbiomeutilities")
+  }
+  
+
+  message("If there was no error then you are ready to do microbiome data analysis")
+  
+}
+
+setup_microbiome_analysis()
+
+# Copy until here previous line!
+
+####################################################END OF CODE###########################################################################

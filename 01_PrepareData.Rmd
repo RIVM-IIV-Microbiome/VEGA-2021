@@ -1,0 +1,427 @@
+---
+title: "Metagenomics Analysis VEGA project"
+subtitle: "Prepare data for analysis"
+author: "Sudarshan"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document: 
+    toc: yes
+    toc_depth: 2
+    toc_float: true
+    code_folding: hide  
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Introduction   
+
+In this preliminary study, we aimed to identify whether long-term dietary habits in a westernized population are associated with differences in gut microbiome composition and species-specific contributions to key metabolic pathways. For this, we used metagenomic data obtained from faecal samples collected from 148 Dutch individuals as part of the NLD-VEGA-cohort. 
+
+## Pepare folder  
+Note: to be run once from root directory.  
+
+```{r}
+dir.create("data_raw")
+#dir.create("analysis")
+dir.create("notes")
+dir.create("codes")
+dir.create("data")
+dir.create("data/rds")
+dir.create("data/tab")
+dir.create("results")
+dir.create("results/composition")
+dir.create("results/composition/rds")
+dir.create("results/composition/fig")
+dir.create("results/composition/tab")
+dir.create("results/function")
+dir.create("results/function/rds")
+dir.create("results/function/fig")
+dir.create("results/function/tab")
+```
+
+## Load libraries  
+
+```{r warning=FALSE, message=FALSE}
+library(dplyr)
+library(readr)
+library(data.table)
+library(purrr)
+library(tidyr)
+library(phyloseq)
+library(ape)
+source("codes/customFuns.R")
+```
+
+## Download tree  
+
+mpa_v30_CHOCOPhlAn_201901_species_tree
+```{r eval=FALSE}
+# download.file("https://github.com/biobakery/MetaPhlAn/raw/1bcd86f639a7b76486a72b50e4a58193230e8e56/metaphlan/utils/mpa_v30_CHOCOPhlAn_201901_species_tree.nwk", destfile = "mpa_v30_CHOCOPhlAn_201901_species_tree.nwk")
+
+#mpa_tree <- ape::read.tree("data_raw/mpa_v30_CHOCOPhlAn_201901_species_tree.nwk")
+#mpa_tree$tip.label <- gsub(".+\\|s__", "", mpa_tree$tip.label)
+```
+
+
+## Read data Metaphlan3  
+
+The `humann3` snakemake pipeline generates `metaphlan3` taxonomy profiles per samples and merged `metaphlan` tables. 
+The per samples file has both relative abundance and read stats. While relative abundance is useful for most analysis, we also keep the number of reads mapped per clade.  
+
+### Relative abundance  
+
+```{r}
+
+mpa.reabund <- readMetaphlan(path="data_raw/all_humann/metaphlan_bugs",
+                        pattern = "*_bugs_list.tsv")
+#getAbundanceTibble(mpa.reabund)
+
+# for other paper reviewer
+control_sample_ps <- subset_taxa(mpa.reabund, !is.na(Species))
+write_tsv(getAbundanceTibble(control_sample_ps), "data/mpa_relative_abundance.tsv")
+
+meta_tab <- as.data.frame(fread("data/metagenome_vega_sample_selection.txt",
+                                header = T, sep = "\t", 
+                                stringsAsFactors = F))
+# rename sampleids
+
+meta_tab$MG_Sample_ID <- gsub("mg_Vega_", "VEGA", meta_tab$MG_Sample_ID)
+rownames(meta_tab) <- meta_tab$MG_Sample_ID
+
+mpa.reabund.ps <- phyloseq::merge_phyloseq(mpa.reabund, 
+                                           phyloseq::sample_data(meta_tab))
+
+
+mpa.reabund.ps <- subset_taxa(mpa.reabund.ps, !is.na(Species))
+
+microbiomeutilities::peak_abundance(mpa.reabund.ps)
+saveRDS(mpa.reabund.ps, "data/rds/mpa.reabund.ps.rds")
+
+```
+
+### Counts  
+```{r}
+
+mpa.ctabund <- readMetaphlan(path="data_raw/all_humann/metaphlan_bugs",
+                             pattern = "*_bugs_list.tsv",
+                             type = "estimated_number_of_reads_from_the_clade")
+
+meta_tab <- as.data.frame(fread("data/metagenome_vega_sample_selection.txt",
+                                header = T, sep = "\t", 
+                                stringsAsFactors = F))
+# rename sampleids
+
+meta_tab$MG_Sample_ID <- gsub("mg_Vega_", "VEGA", meta_tab$MG_Sample_ID)
+rownames(meta_tab) <- meta_tab$MG_Sample_ID
+
+mpa.ctabund.ps <- phyloseq::merge_phyloseq(mpa.ctabund, 
+                                           phyloseq::sample_data(meta_tab))
+
+microbiomeutilities::peak_abundance(mpa.ctabund.ps)
+
+mpa.ctabund.ps <- subset_taxa(mpa.ctabund.ps, !is.na(Species))
+saveRDS(mpa.ctabund.ps, "data/rds/mpa.ctabund.ps.rds")
+```
+
+```{r eval=FALSE}
+# clean memory
+mpa.ctabund.ps <- NULL
+mpa.reabund.ps <- NULL
+mpa.reabund <- NULL
+mpa.ctabund <- NULL
+```
+
+
+## Read data Humann3  
+
+### Pathway abundance  
+
+```{r}
+
+pwy_files <- list.files(path="data_raw/all_humann/humann3_tables/",
+                          pattern = "*_pathabundance_cpm_join.tsv",
+                          full.names = T,
+                          recursive = FALSE)
+
+### Iterate over each file, reading in data each time
+
+
+pwy_tbs <- lapply(pwy_files, fread,check.names=TRUE)
+for(i in 1:length(pwy_tbs)){
+  colnames(pwy_tbs[[i]])[1] <- "feature" # rename pathway to feature
+  #colnames(pwy_tbs)
+  colnames(pwy_tbs[[i]]) <- gsub("mg_Vega_", "VEGA", colnames(pwy_tbs[[i]]))
+  #pwy_tbs[[i]] <- pwy_tbs[[i]] %>% select(-contains("_Abundance_1")) # remove duplicated columns
+  colnames(pwy_tbs[[i]]) <- sub("\\_.*", "", colnames(pwy_tbs[[i]]))
+  #make_unique and remove duplicates with a DT
+  colnames(pwy_tbs[[i]]) <- make.unique(colnames(pwy_tbs[[i]]))
+  pwy_tbs[[i]] <- pwy_tbs[[i]] %>% select(-contains(".1"))
+  #colnames(pwy_tbs[[i]]) <- paste0(colnames(pwy_tbs[[i]]), "_DT", i)
+  
+}
+pwy_tbs2 <- Reduce(function(...) merge(..., all=T), pwy_tbs)
+
+pwy_tbs2[is.na(pwy_tbs2)] <- 0
+# remove duplicates from different runs. Some samples were repeatedly run with humann2
+pwy_tbs2 <- pwy_tbs2 %>% select(-ends_with(".y"))
+colnames(pwy_tbs2) <- gsub(".x", "", colnames(pwy_tbs2))
+
+#setdiff(rownames(meta_tab),colnames(pwy_tbs2))
+saveRDS(pwy_tbs2, "data/rds/pathway_main_abund_cpm.rds")
+
+```
+
+### Save pathway tables  
+```{r}
+# Pathways combined abundance  no taxa specific
+pwy_tbs_ab <- pwy_tbs2 %>% 
+  separate(feature, c("feature", "organism"), sep = "\\|", fill = "right") %>% 
+  filter(is.na(organism)) %>% 
+  select(-organism) %>% 
+  filter(!(grepl("^UN", feature))) 
+
+#pwy_tbs_ab[1:10,1:10]
+
+saveRDS(pwy_tbs_ab, "data/rds/pathway_abund_cpm.rds")
+
+# Pathways only taxa specific
+pwy_tx_ab <- pwy_tbs2 %>% 
+  separate(feature, c("feature", "organism"), sep = "\\|", fill = "right") %>% 
+  filter(!is.na(organism)) %>% 
+  unite(col= "feature_organism",c("feature", "organism"),sep = "|")
+
+#pwy_tx_ab[1:10,1:10]
+
+saveRDS(pwy_tx_ab, "data/rds/pathway_taxa_abund_cpm.rds")
+
+```
+
+Empty memory  
+```{r}
+mpa.ctabund.ps <- mpa.reabund.ps <- pwy_tbs_ab <- pwy_tbs2 <- pwy_tx_ab <- pwy_tbs <- NULL
+```
+
+### KO abundance  
+
+```{r}
+ko_files <- list.files(path="data_raw/all_humann/humann3_tables/",
+                        pattern = "*_genefamilies_KO_cpm_join.tsv", 
+                        full.names = T, recursive = FALSE)
+
+### Iterate over each file, reading in data each time
+ko_tbs <- lapply(ko_files, fread)
+
+
+for(i in 1:length(ko_tbs)){
+  colnames(ko_tbs[[i]])[1] <- "feature" # rename pathway to feature
+  #colnames(pwy_tbs)
+  colnames(ko_tbs[[i]]) <- gsub("mg_Vega_", "VEGA", colnames(ko_tbs[[i]]))
+  #pwy_tbs[[i]] <- pwy_tbs[[i]] %>% select(-contains("_Abundance_1")) # remove duplicated columns
+  colnames(ko_tbs[[i]]) <- sub("\\_.*", "", colnames(ko_tbs[[i]]))
+  #make_unique and remove duplicates with a DT
+  colnames(ko_tbs[[i]]) <- make.unique(colnames(ko_tbs[[i]]))
+  ko_tbs[[i]] <- ko_tbs[[i]] %>% select(-contains(".1"))
+  
+}
+
+ko_tbs <- Reduce(function(...) merge(..., all=T), ko_tbs)
+
+ko_tbs[is.na(ko_tbs)] <- 0
+# remove duplicates from different runs. Some samples were repeatedly run with humann2
+ko_tbs <- ko_tbs %>% select(-ends_with(".y"))
+colnames(ko_tbs) <- gsub(".x", "", colnames(ko_tbs))
+
+head(ko_tbs)
+saveRDS(ko_tbs, "data/rds/ko_main_abund_cmp.rds")
+
+```
+
+
+### Save KO tables  
+```{r}
+# Pathways combined abundance  no taxa specific
+ko_tbs_ab <- ko_tbs %>% 
+  separate(feature, c("feature", "organism"), sep = "\\|", fill = "right") %>% 
+  filter(is.na(organism)) %>% 
+  select(-organism) %>% 
+  filter(!(grepl("^UN", feature))) 
+
+#pwy_tbs_ab[1:10,1:10]
+
+saveRDS(ko_tbs_ab, "data/rds/ko_abund_cpm.rds")
+
+# Pathways only taxa specific
+ko_tx_ab <- ko_tbs %>% 
+  separate(feature, c("feature", "organism"), sep = "\\|", fill = "right") %>% 
+  filter(!is.na(organism)) %>% 
+  unite(col= "feature_organism",c("feature", "organism"),sep = "|")
+
+#pwy_tx_ab[1:10,1:10]
+
+saveRDS(ko_tx_ab, "data/rds/ko_taxa_abund_cpm.rds")
+
+```
+
+Empty memory  
+```{r}
+ko_tbs_ab <- ko_tbs <- ko_tx_ab <- NULL
+```
+
+
+## Create GMM    
+ 
+```{r}
+meta_tab <- as.data.frame(fread("data/metagenome_vega_sample_selection.txt",
+                                header = T, sep = "\t", 
+                                stringsAsFactors = F))
+
+meta_tab$MG_Sample_ID <- gsub("mg_Vega_", "VEGA", meta_tab$MG_Sample_ID)
+rownames(meta_tab) <- meta_tab$MG_Sample_ID
+meta_tab <- meta_tab[, -1]
+colnames(meta_tab)[1] <- "unqiueID"
+meta_tab$sampleID <- rownames(meta_tab)
+dim(meta_tab)
+```
+
+
+```{r}
+ko_tx_ab <- readRDS("data/rds/ko_taxa_abund_cpm.rds")
+
+# read a functional profile matrix into R or create it inside R. Please note that row.names should not be used while reading the matrix. 
+ko_tx_sp <- ko_tx_ab %>% 
+  separate(feature_organism, c("feature", "organism"), sep = "\\|", fill = "right") %>%
+  as.data.frame()
+
+ko_tx_sp$id <- seq(1:nrow(ko_tx_sp))
+
+sample_nm <- colnames(ko_tx_sp)[3:(ncol(ko_tx_sp)-1)]
+ko_tx_sp <- ko_tx_sp[,c("id","organism", "feature", sample_nm)]
+
+# remove controls mock and negative
+ko_tx_sp <- ko_tx_sp[,-c(131,132)]
+
+# Save file for GOmixer (http://www.raeslab.org/omixer/)
+write_delim(ko_tx_sp, "data/tab/ko_sp_for_gmm.txt", delim = "\t")
+
+mt.dat <- as.data.frame(t(meta_tab))[c(1,5),]
+
+
+write.table(mt.dat, "data/tab/meta_for_gmm.txt", sep = "\t")
+
+```
+
+
+
+```{r}
+sessionInfo()
+```
+
+
+********************* END *********************  
+
+## Read GMM  
+```{r eval=FALSE}
+gmm_cftn <- fread("data/tab/module_classification.txt")
+
+colnames(gmm_cftn)[1] <- "Module"
+```
+
+```{r eval=FALSE}
+
+gmm_nm <- fread("data/tab/gutmicrobe_ageGut.tsv")
+colnames(gmm_nm)[1] <- "TaxaModule"
+
+#unique(gmm_nm$TaxaModule)
+#head(gmm_nm)
+gmm_nm <-  gmm_nm %>% 
+  separate(TaxaModule, c("Taxa", "Module"), sep = "_(?=[^_]+$)", fill = "right") %>%
+  separate(Taxa, c("Genus", "Species"), sep = "\\.", fill = "right") %>% 
+  mutate(Species = ifelse(is.na(Species), Genus, Species)) %>% 
+  filter(Species!="unclassified")
+
+# join classification
+gmm_tx <- gmm_nm %>% 
+  left_join(gmm_cftn)
+
+colnames(gmm_tx) <- gsub("Hierarchy, ","",colnames(gmm_tx))
+
+# melt to long and join metadata
+gmm_tx <- reshape2::melt(gmm_tx) %>% 
+  left_join(meta_tab, by=c("variable"="sampleID"))
+
+saveRDS(gmm_tx, "data/rds/gmm_tx.rds")
+
+```
+
+
+```{r eval=FALSE}
+library(curatedMetagenomicData)
+library(dplyr)
+```
+
+```{r eval=FALSE}
+
+select_studies <- c("DhakanDB_2019", "DeFilippisF_2019",
+                    "KaurK_2020", "HansenLBS_2018",
+                    "LifeLinesDeep_2016","KeohaneDM_2020",
+                    "BritolLL_2016", "HanniganGD_2017",
+                    "Obregon-TitoAJ_2015", "PasolliE_2019",
+                    "RubelMA_2020","RosaBA_2018",
+                    "XieH_2016","SmitsSA_2017",
+                    "LiuW_2016", "TettAJ_2019_A",
+                    "QinJ_2012","PehrssonE_2016",
+                    "PasolliE_2019")
+
+study.interest <- sampleMetadata %>%
+  filter(disease == "healthy" & body_site== "stool") %>%
+  select(where(~ !any(is.na(.x)))) %>% 
+  filter(age_category == "adult") %>% 
+  filter(study_name %in% select_studies)
+
+table(study.interest$country, study.interest$non_westernized)
+```
+
+```{r eval=FALSE}
+library(mia)
+library(scater)
+library(dplyr)
+tse.curateddb <- study.interest %>% 
+  returnSamples("relative_abundance")
+
+altExps(tse.curateddb) <- splitByRanks(tse.curateddb)
+
+
+tse.curateddb %>%
+  estimateDiversity(abund_values = "relative_abundance", index = "shannon") %>%
+  plotColData(x = "country", y = "shannon", colour_by = "country") +
+  labs(x = "Country", y = "Alpha Diversity (H')") +
+  guides(color = guide_none(), shape = guide_none()) +
+    theme(legend.position = "none")
+
+saveRDS(tse.curateddb, "tse.curateddb.rds")
+tse.curateddb <- readRDS("tse.curateddb.rds")
+
+pseq.curateddb <- makePhyloseqFromTreeSummarizedExperiment(tse.curateddb,
+                                                           abund_values="relative_abundance")
+saveRDS(pseq.curateddb, "pseq.curateddb.rds")
+```
+
+```{r eval=FALSE}
+
+tse.curateddb %>%
+    runUMAP(exprs_values = "relative_abundance", 
+            altexp = "Genus", 
+            name = "UMAP") %>%
+    plotReducedDim("UMAP",
+                   colour_by = "country", 
+                   shape_by = "non_westernized") +
+  # 
+    labs(x = "UMAP 1", 
+         y = "UMAP 2") +
+    guides(colour = guide_legend(title = "Country"), 
+           shape = guide_legend(title = "non_westernnized")) 
+
+```
+
+

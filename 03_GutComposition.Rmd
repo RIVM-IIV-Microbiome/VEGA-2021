@@ -1,0 +1,686 @@
+---
+title: "Metagenomics Analysis VEGA project"
+subtitle: "Composition analysis"
+author: "Sudarshan"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document: 
+    toc: yes
+    toc_depth: 2
+    toc_float: true
+    code_folding: hide
+---
+
+# Introduction  
+Faecal samples from Dutch individuals with long-term dietary habits diet were categorized into omnivores, pescatarians, vegetarians and vegans. Samples were sequenced using metagenomic shotgun sequencing to investigate the microbiome composition and potential.  
+
+The raw sequencing data were processed using an in-house snake-make pipeline using fastqc, bbduk, metaphlan3 and humann3 tools.  
+
+# Analysis   
+
+Key questions:  
+What is the composition of VEGA cohort compared to other populations across the world?  
+
+## Load pkgs  
+```{r message=FALSE, warning=FALSE}
+library(microbiomeutilities) # from GitHub
+library(dplyr)
+library(stringr)
+library(biomeUtils) # from GitHub
+library(reshape2)
+library(tibble)
+library(patchwork)
+library(readr)
+library(ggvenn)
+
+# Some custom functions
+source('codes/customFuns.R')
+
+cols_grps <- c(
+  Omnivore = "#ef476f",
+  Pescatarian = "#f2cc8f",
+  Vegan = "#4ecdc4",
+  Vegetarian = "#1a936f"
+)
+
+
+```
+
+## Read data  
+
+```{r}
+# relative abundance data
+mpa.reabund.ps <- readRDS("data/rds/mpa.reabund.ps.rds")
+# count data
+mpa.ctabund.ps <- readRDS("data/rds/mpa.ctabund.ps.rds")
+
+taxa_names(mpa.reabund.ps) <- gsub("s__", "", taxa_names(mpa.reabund.ps))
+taxa_names(mpa.reabund.ps) <- gsub("_", " ", taxa_names(mpa.reabund.ps))
+
+taxa_names(mpa.ctabund.ps) <- gsub("s__", "", taxa_names(mpa.ctabund.ps))
+taxa_names(mpa.ctabund.ps) <- gsub("_", " ", taxa_names(mpa.ctabund.ps))
+```
+
+
+```{r}
+meta.tib <- getSampleTibble(mpa.ctabund.ps)
+table(meta.tib$Age_groups, meta.tib$Group)
+```
+
+#  Overview of taxa  
+
+## Phylum  
+```{r}
+phylum.stats <- getTaxaSummary(mpa.ctabund.ps, rank = "Phylum") 
+phylum.stats
+write_delim(phylum.stats, "results/composition/tab/phylum.stats.tsv")
+
+```
+
+Firmicutes, Bacteroidetes and Actinobacteria are top three Phyla comprising 97.4% of the total data. 
+
+## Family  
+```{r}
+family.stats <- getTaxaSummary(mpa.ctabund.ps, rank = "Family") 
+family.stats
+write_delim(family.stats, "results/composition/tab/family.stats.tsv")
+```
+
+Lachnospiraceae, Bacteroidaceae, and Ruminococcaceae are top three Families comprising of 64.9% of total data.
+
+## Genus   
+```{r}
+genus.stats <- getTaxaSummary(mpa.ctabund.ps, rank = "Genus") 
+genus.stats
+write_delim(genus.stats, "results/composition/tab/genus.stats.tsv")
+
+```
+
+*Bacteroides*, *Faecalibacterium*, *Roseburia* are top three Genera comprising 38.9% of the total data. 
+
+## Species  
+```{r}
+species.stats <- getTaxaSummary(mpa.ctabund.ps, rank = "Species") 
+species.stats
+write_delim(species.stats, "results/composition/tab/species.stats.tsv")
+
+```
+
+*Faecalibacterium prausnitzii*, *Bacteroides uniformis* and *Prevotella copri* are top three Species comprising 19.53% of the total data. 
+
+These data are comparable to other Western Populations.  
+
+# Compare to global gut metagenomes  
+
+Comparison with global gut metagenomes. We use the `curatedMetagenomicDB` package that has metagenomic data processed with `metaphlan3` as we have done with our data.  
+
+## Load global data  
+```{r}
+pseq.curateddb <- readRDS("data/rds/pseq.curateddb.rds")
+# remove candaonly three samples
+pseq.curateddb <- filterSampleData(pseq.curateddb,
+                                   country !="CAN")
+
+# Adding species names
+taxa_names(pseq.curateddb) <- tax_table(pseq.curateddb)[,"Species"]
+#taxa_names(pseq.curateddb)[1:5]
+## Cleaning the names
+taxa_names(mpa.reabund.ps) <- gsub("s__", "", taxa_names(mpa.reabund.ps))
+taxa_names(mpa.reabund.ps) <- gsub("_", " ", taxa_names(mpa.reabund.ps))
+#taxa_names(mpa.reabund.ps)[1:5]
+
+```
+
+*How many species are common to global and vega samples?*  
+```{r}
+table(taxa_names(pseq.curateddb) %in% taxa_names(mpa.reabund.ps))
+```
+
+We have 474 species in vega samples are detected in global samples. 
+
+*Which species are unique to VEGA?*
+```{r}
+
+uniq.vega.sp <- taxa_names(mpa.reabund.ps)[!taxa_names(mpa.reabund.ps) %in% taxa_names(pseq.curateddb)]
+uniq.vega.sp
+#taxa_names(mpa.reabund.ps) %in% taxa_names(pseq.curateddb)
+```
+
+The species above are unique to VEGA. We can check their prevalence.  
+
+```{r}
+vega.unique.sp <- rev(sort(prevalence(mpa.reabund.ps)[uniq.vega.sp] *100))
+vega.unique.sp
+```
+
+Two Collinsella species, C. stercoris   [Collinsella] massiliensis are highly prevalent in VEGA cohort.  
+
+## Merge VEGA and Global   
+
+```{r}
+#head(meta(pseq.curateddb))
+#getAbundanceTibble(pseq.curateddb)$SID01.BA.VG.2[125:150]
+
+mpa.reabund.ps <- mutateSampleData(mpa.reabund.ps, 
+                                   study_name = "VEGA",
+                                   disease = "healthy", 
+                                   country = "NLD-VEGA",
+                                   non_westernized = "no",
+                                   subject_id =  MG_Sample_ID,
+                                   Group = ifelse(Group== "Meat consumer", "Omnivore", Group))
+
+ps.merge <- merge_phyloseq(pseq.curateddb, mpa.reabund.ps)
+# convert NLD to NLD-LifeLines
+ps.merge <- mutateSampleData(ps.merge,
+                             country = ifelse(country == "NLD", "NLD-LifeLines", country))
+```
+
+
+Do the NLD-VEGA participants have gut microbiota similar to Westernized populations.  
+
+## PCoA  
+```{r}
+
+# Does clr transformation. Pseudocount is added, because data contains zeros. 
+mgs.clr <- transform.clr(ps.merge)
+# Transposes it to get taxa to columns
+mgs.clr <- t(mgs.clr)
+# Calculates Euclidean distances between samples. Because taxa is in columns,
+# it is used to compare different samples.
+euclidean_dist <- vegan::vegdist(mgs.clr, method = "euclidean")
+
+# takes time so save this output
+saveRDS(euclidean_dist, "data/rds/euclidean_dist.rds")
+
+# Does principal coordinate analysis
+euclidean_pcoa <- ecodist::pco(euclidean_dist)
+
+sample.meta <- getSampleTibble(ps.merge, column_id = "SampleID")
+
+# Creates a data frame from principal coordinates
+euclidean_pcoa_df <- tibble(pcoa1 = euclidean_pcoa$vectors[,1], 
+                                pcoa2 = euclidean_pcoa$vectors[,2]) %>% 
+  mutate(subject_id=rownames(mgs.clr)) %>% 
+  dplyr::left_join(sample.meta, by = c(subject_id = "SampleID")) %>% 
+  mutate(Westernized = ifelse(non_westernized == "yes", "NO", "YES"))
+
+```
+
+### Plot PCoA  
+```{r}
+# Creates a Global plot
+euclidean_plot <- ggplot(data = euclidean_pcoa_df, 
+                         aes(x=pcoa1, y=pcoa2)) +
+  geom_hline(yintercept = 0, color="grey80")+
+  geom_vline(xintercept = 0,color="grey80") +
+  geom_point(aes(color=Westernized), alpha=0.3, size=1) +
+  theme_minimal() + 
+  labs(x = "Coordinate 1",
+       y = "Coordinate 2",
+       #title = "Western and Non-Western Microbiomes"
+       ) +
+  #theme(title = element_text(size = 12)) + # makes titles smaller +
+scale_color_manual("Westernized", values = c("grey50","brown3"))
+
+ggsave("results/composition/fig/pcoa_global.pdf", h=4, w=6)
+
+# Creates a Global plot with NLD in focus
+euclidean_plot_NLD <- euclidean_pcoa_df %>% 
+  mutate(Country_2 = ifelse(country %in% c("NLD-LifeLines","NLD-VEGA"), country, "Other")) %>% 
+  ggplot(aes(x=pcoa1, y=pcoa2)) +
+  geom_hline(yintercept = 0, color="grey80")+
+  geom_vline(xintercept = 0,color="grey80") + 
+  #geom_density_2d_filled(alpha = 0.5)
+  #geom_density_2d() +
+  geom_point(aes(color=Country_2), alpha=0.3, size=1) +
+  theme_minimal() + 
+  labs(x = "Coordinate 1",
+       y = "Coordinate 2",
+       #title = "LifeLines and VEGA Gut Microbiomes in Global Context"
+       ) +
+  #theme(title = element_text(size = 12)) + # makes titles smaller +
+  scale_color_manual("Country", values = c('NLD-VEGA' = "#EFC000FF", 'NLD-LifeLines'="#0073C2FF", Other = "grey30")) 
+
+ggsave("results/composition/fig/pcoa_nld_focus.pdf", h=4, w=6)
+```
+
+Compare similarity to other human gut metagenomes. 
+
+```{r}
+
+bray_dist <- vegan::vegdist(t(abundances(ps.merge)), method = "bray")
+
+bray_dist_tib <- (1-bray_dist) %>% 
+  as.matrix() %>% 
+  as.data.frame() %>% 
+  tibble::rownames_to_column("subject_id") %>% 
+  reshape2::melt() %>% 
+  dplyr::rename( S1 = "subject_id", S2 = "variable") %>% 
+  as_tibble() %>% 
+  dplyr::left_join(euclidean_pcoa_df, by = c("S1" = "subject_id")) %>%
+  dplyr::left_join(euclidean_pcoa_df, by = c("S2" = "subject_id"), suffix = c("_S1", "_S2")) %>%
+  dplyr::filter(S1!=S2)
+
+vega_dist_to_others <- bray_dist_tib %>% 
+  dplyr::filter(country_S2=="NLD-VEGA") %>% 
+  dplyr::filter(country_S1 != country_S2) %>% 
+  dplyr::mutate(comparison= paste0(country_S1, " vs ", country_S2),
+                value = value) %>% 
+  dplyr::group_by(S2, comparison) %>% 
+  dplyr::summarise(mean.dist=mean(value, na.rm = TRUE)) 
+
+bc.plot <- vega_dist_to_others %>% 
+  tidyr::separate(comparison, c("Grp1", "Grp2"), sep = " vs ") %>% 
+  ggplot(aes(reorder(Grp1, mean.dist, FUN = mean), mean.dist)) +
+  geom_boxplot(width = 0.6,
+               na.rm = TRUE, 
+               outlier.shape = NA) +
+  geom_jitter(width = 0.1, 
+              na.rm = TRUE, 
+              alpha=0.5 , 
+              color="grey50") +
+  theme_minimal() +
+  xlab("") +
+  ylab("Mean similarity (1-BC)") +
+  coord_flip()
+ggsave("results/composition/fig/distance_to_countires.pdf", h=5, w=4)
+```
+
+# Core species in Dutch populations    
+
+```{r eval=TRUE}
+library(parallel)
+source("codes/bootstrap_core.R")
+
+ps.lifelines <- filterSampleData(ps.merge, study_name =="LifeLinesDeep_2016")
+ps.vega <-  filterSampleData(ps.merge, study_name =="VEGA")
+set.seed(26052321)
+# lifelines thresholds
+lifelines.sample.fract <- round(0.80*nsamples(ps.lifelines))
+lifelines.sample.fract 
+lifelines.prev.fract <- round(0.75*lifelines.sample.fract)
+lifelines.prev.fract
+
+cor.boot.lifelines <- bootstrap.microbes(abundances(ps.lifelines)/100, 
+                                         Nsample = lifelines.sample.fract, 
+                                         minPrev = lifelines.prev.fract, 
+                                         Nboot = 100, 
+                                         I.thr = 0.000001, 
+                                         I.max = 1e-06,
+                                         ncore = 4)
+core.lifelines <- subset(cor.boot.lifelines, suggested.core == 1)
+core.lifelines
+
+# VEGA thresholds
+vega.sample.fract <- round(0.80*nsamples(ps.vega))
+vega.sample.fract 
+vega.prev.fract <- round(0.75*vega.sample.fract)
+vega.prev.fract
+
+#apply(otu_table(ps.lifelines), 1,min2)
+
+cor.boot.vega <- bootstrap.microbes(abundances(ps.vega)/100, 
+                                    Nsample = vega.sample.fract, 
+                                    minPrev = vega.prev.fract, 
+                                    Nboot = 100, 
+                                    I.thr = 0.000001, 
+                                    I.max = 1e-06,
+                                    ncore = 4)
+
+core.vega <- subset(cor.boot.vega, suggested.core == 1)
+core.vega
+
+```
+
+Common core
+
+```{r}
+intersect(core.lifelines$Microbe, core.vega$Microbe)
+```
+
+All core taxa identified in the larger lifelines cohort are detected in core microbiome of vega cohort. 
+
+Core in lifeline but not in VEGA.  
+```{r}
+setdiff(core.lifelines$Microbe, core.vega$Microbe)
+```
+
+```{r}
+
+core.microb <- list(
+  'LifeLines Core Microbiome' = core.lifelines$Microbe, 
+  'VEGA Core Microbiome' = core.vega$Microbe)
+
+core.venn.plot <- ggvenn(core.microb, 
+                         fill_color = c("#0073C2FF", "#EFC000FF", "#868686FF", "#CD534CFF"),
+                         stroke_size = 0.5, set_name_size = 3)
+core.venn.plot
+ggsave("results/composition/fig/core_venn.pdf", h=4, w=4)
+
+```
+
+```{r}
+
+common.core <- intersect(core.lifelines$Microbe, core.vega$Microbe)
+ps.vega@phy_tree <- NULL
+ps.lifelines@phy_tree  <- NULL
+ps.nld.core <- merge_phyloseq(ps.vega, ps.lifelines) %>% 
+  filterTaxaByNames(ids = common.core)
+
+select_cols <- as.data.frame(meta(ps.nld.core)[,"study_name"])
+rownames(select_cols) <- rownames(meta(ps.nld.core))
+colnames(select_cols) <- "Study"
+phaet <- pheatmap::pheatmap(abundances(ps.nld.core),
+                            annotation_col = select_cols,
+                            cluster_cols = FALSE,
+                            show_colnames = FALSE,
+                            annotation_colors = list("Study"=c('VEGA' = "#EFC000FF", 'LifeLinesDeep_2016'="#0073C2FF")),
+                            filename = "results/composition/fig/core_pheatmap.pdf", 
+                            height = 6, width = 8)
+
+
+hclust.tx <- hclust(dist(abundances(ps.nld.core)))
+hclust.tx$order
+
+
+ldf <- getAbundanceTibble(ps.nld.core) %>% 
+  tidyr::pivot_longer(-FeatureID, values_to = "Abundance", names_to = "SampleID") %>% 
+  left_join(getSampleTibble(ps.nld.core))
+
+ldf$FeatureID <- factor(ldf$FeatureID, levels = rev(rownames(abundances(ps.nld.core))[hclust.tx$order]))
+#rownames(abundances(ps.nld.core))[hclust.tx$order]
+
+common.core.heatmap <- ggplot(ldf, aes(SampleID, FeatureID)) +
+  geom_tile(aes(fill=Abundance)) +
+  facet_grid(~study_name, scales="free") +
+  theme_minimal(base_size = 10) +
+  viridis::scale_fill_viridis("Relative \nabundance(%)") +
+  theme(axis.text.x = element_blank(),
+        axis.text.y = element_text(face="italic")) +
+  labs(x="", y="")
+ggsave("results/composition/fig/core_heatmap.pdf", h=5, w=6)
+
+
+vega.prev <- getTaxaTibble(ps.vega) %>% 
+  mutate('NLD-VEGA' = prevalence(ps.vega)) %>% 
+  select(Species, 'NLD-VEGA') %>% 
+  filter(Species %in% common.core)
+
+lifelines.prev <- getTaxaTibble(ps.lifelines) %>% 
+  mutate('NLD-LifeLines' = prevalence(ps.lifelines)) %>% 
+  select(Species, 'NLD-LifeLines') %>% 
+  filter(Species %in% common.core)
+
+common.core.prev.plot <- vega.prev %>% 
+  left_join(lifelines.prev) %>% 
+  reshape2::melt() %>% 
+  ggplot() +
+  theme_minimal(base_size = 10) +
+  geom_col(aes(value, Species, fill=variable), 
+           position = position_dodge(.7),
+           width = .6,
+           alpha=0.5) +
+  theme(axis.text.y = element_text(face = "italic", size=6),
+        axis.title.y = element_blank()) + 
+  xlab("Common Core Prevalence") +
+  scale_fill_manual("Country", values = c('NLD-VEGA' = "#EFC000FF", 'NLD-LifeLines'="#0073C2FF"))
+ggsave("results/composition/fig/core_prevalence.pdf", h=6, w=4)
+
+```
+
+
+```{r fig.width=10, fig.height=8}
+(euclidean_plot + euclidean_plot_NLD) / (bc.plot + common.core.prev.plot) +
+  plot_layout(guides = "collect") + 
+  plot_annotation(tag_levels = "A")
+
+ggsave("results/composition/fig/01_Figure_1.pdf", h=6, w=8)
+
+```
+
+
+# Key taxa ratios  
+Prevotella/Bacteroides ratio  
+```{r}
+
+ps.merge.g <- aggregate_taxa(ps.merge, level = "Genus")
+
+bacteroides <- abundances(ps.merge.g)["Bacteroides", ]
+prevotella <- abundances(ps.merge.g)["Prevotella", ]
+
+ps.merge <- mutateSampleData(ps.merge,
+                             Bac_Prev_ratio = prevotella/prevotella + bacteroides)
+
+bac.prev.ratio <- getSampleTibble(ps.merge) %>% 
+  filter(country == "NLD-VEGA")
+
+
+bac.prev.ratio %>% group_by(Group) %>% 
+  get_summary_stats(Bac_Prev_ratio, type = "median_iqr")
+
+gghistogram(bac.prev.ratio, x = "Bac_Prev_ratio", y = "..density..", 
+            fill = "steelblue", add_density = TRUE)
+
+bac.prev.ratio.test <- bac.prev.ratio %>%
+  rstatix::wilcox_test(Bac_Prev_ratio ~ Group,
+                       paired = F) %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance("p.adj")%>% 
+  add_xy_position(x = "Group")
+
+
+bac.prev.plot <- ggboxplot(bac.prev.ratio, x = "Group", 
+                           y = "Bac_Prev_ratio",
+                           color="Group",
+                           palette = cols_grps, scales = "free_y",
+                           add = "jitter", width=0.4,
+                           jitter = 0.1, add.params = list(alpha=0.25)) + 
+  theme_vega() +
+  ylab(expression(~italic("Prevotella/Bacteroides"))) +
+  theme(legend.position = "none",
+        axis.title.x = element_blank()) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) + 
+  rotate_x_text(angle = 45) + 
+  theme(legend.position = "none")  +
+  stat_pvalue_manual(bac.prev.ratio.test,
+                     label = "p.adj.signif",
+                     hide.ns = TRUE, 
+                     tip.length = 0) 
+
+ggsave("results/composition/fig/bac.prev.plot.pdf", h=6, w=8)
+```
+
+No statistically significant difference in Prevotella/Bacteroides ratio after correcting for multiple testing.  
+
+```{r}
+ps.merge.phy <- aggregate_taxa(ps.merge, level = "Phylum")
+
+firmtes <- abundances(ps.merge.phy)["Firmicutes", ]
+bactes <- abundances(ps.merge.phy)["Bacteroidetes", ]
+
+ps.merge <- mutateSampleData(ps.merge,
+                             firm_bac_ratio = firmtes/firmtes + bactes)
+
+firm.bac.ratio <- getSampleTibble(ps.merge) %>% 
+  filter(country == "NLD-VEGA")
+
+firm.bac.ratio %>% 
+  group_by(Group) %>% 
+  get_summary_stats(firm_bac_ratio, type = "median_iqr")
+gghistogram(firm.bac.ratio, x = "firm_bac_ratio", y = "..density..", 
+            fill = "steelblue", add_density = TRUE)
+
+firm.bac.ratio.test <- firm.bac.ratio %>%
+  rstatix::wilcox_test(firm_bac_ratio ~ Group,
+                       paired = F) %>%
+  rstatix::adjust_pvalue(method = "BH") %>%
+  rstatix::add_significance("p.adj")  %>% 
+  add_xy_position(x = "Group")
+
+firm.bac.plot <- ggboxplot(firm.bac.ratio, x = "Group", 
+                           y = "firm_bac_ratio",
+                           color="Group",
+                           palette = cols_grps, scales = "free_y",
+                           add = "jitter", width=0.4,
+                           jitter = 0.1, add.params = list(alpha=0.25)) + 
+  theme_vega() +
+  ylab("Firmicutes/Bacteroidetes") +
+  theme(legend.position = "none",
+        axis.title.x = element_blank()) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.1))) + 
+  rotate_x_text(angle = 45) + 
+  theme(legend.position = "none") +
+  stat_pvalue_manual(firm.bac.ratio.test,
+                       label = "p.adj.signif",
+                       hide.ns = TRUE, 
+                       tip.length = 0) 
+
+ggsave("results/composition/fig/firm.bac.plot.pdf", h=6, w=8)
+```
+
+```{r fig.width=10, fig.height=12}
+(euclidean_plot + euclidean_plot_NLD) / (bc.plot + common.core.prev.plot) / (firm.bac.plot + bac.prev.plot) + 
+  plot_layout(guides = "collect") + 
+  plot_annotation(tag_levels = "a")
+ggsave("results/composition/fig/01-Fig-01.pdf", h=6, w=8)
+
+p1 <- (euclidean_plot + euclidean_plot_NLD)
+
+p2 <- (bc.plot | common.core.heatmap) / (firm.bac.plot + bac.prev.plot) + plot_layout(heights = c(1,0.5))
+
+p1 / p2 + 
+  plot_layout(heights = c(1,2), guides = "collect") +
+  plot_annotation(tag_levels = "a")
+ggsave("results/composition/fig/01-Fig-01.pdf", h=10, w=10)
+
+```
+
+# Supplementary data  
+
+## VANISH and BloSUm taxa  
+
+VANISH taxa are Prevotellaceae, Succinovibrionaceae, Paraprevotellaceae, and Spirochaetaceae  
+
+### Check VANISH in Gobal context    
+```{r}
+dir.create("results/supp")
+#DT::datatable(getTaxaSummary(ps.merge, rank="Family"))
+#getTaxaTibble(pseq.curateddb) %>% count(Family)
+#ps.merge.vanish.fams <- aggregate_taxa(ps.merge.vanish, "Family")
+vanish.families <- c("Prevotellaceae", "Succinivibrionaceae", "Paraprevotellaceae", "Spirochaetaceae")
+ps.merge <- mutateSampleData(ps.merge,
+                             Westernized = ifelse(non_westernized == "yes", "NO", "YES"))
+ps.merge.vanish <- subset_taxa(ps.merge, Family %in% vanish.families)
+
+#DT::datatable(getTaxaSummary(ps.merge.vanish, rank="Family"))
+
+
+western.cols <- c("brown3", "grey90")
+
+df.vanish.abund <- aggregate_taxa(ps.merge, "Family") %>% 
+  microbiome::transform("clr") %>% 
+  subset_taxa(Family %in% vanish.families) %>% 
+  phy_to_ldf(transform.counts = NULL) 
+
+plot.vanish.abund <- ggplot(df.vanish.abund, aes(Abundance, country, fill=Westernized)) + 
+  geom_boxplot(width = 0.5, outlier.shape = NA, alpha = 0.3) +
+  facet_grid(~Family) +
+  scale_fill_manual("Westernized", values = c( "NO" = "grey50", "YES" = "brown3")) +
+  ylab("Country") +
+  xlab("Abundance (clr)") +
+  theme_minimal() +
+  labs(subtitle = "VANISH taxa in Gobal context")
+#plot.vanish.abund
+ggsave("results/supp/global_vanish.pdf", h=5, w=9)
+
+```
+
+### Check VANISH within VEGA  
+
+```{r}
+
+cols_grps <- c(
+  `Meat consumer` = "#ef476f",
+  Pescatarian = "#f2cc8f",
+  Vegan = "#4ecdc4",
+  Vegetarian = "#1a936f"
+)
+
+plot.vanish.abund.NLD.vega <- df.vanish.abund %>% 
+  filter(country=="NLD-VEGA") %>% 
+  ggplot(aes(Abundance, Group,fill=Group)) + 
+  geom_boxplot(width = 0.5, outlier.shape = NA, alpha = 0.3) +
+  facet_grid(~Family) +
+  scale_fill_manual("NLD-VEGA", values=cols_grps) +
+  ylab("Country") +
+  xlab("Abundance (clr)") +
+  theme_minimal(base_size = 12)+
+  labs(subtitle = "VANISH taxa in NLD-VEGA")
+ggsave("results/supp/vega_vanish.pdf", h=3, w=7)
+#plot.vanish.abund.NLD.vega
+```
+
+### Check BloSSUM in Global context   
+Bloom or selected in societies of urbanization/modernization  
+```{r}
+
+blossum.families <- c("Akkermansiaceae", "Bacteroidaceae")
+df.blossum.abund <- aggregate_taxa(ps.merge, "Family") %>% 
+  microbiome::transform("clr") %>% 
+  subset_taxa(Family %in% blossum.families) %>% 
+  phy_to_ldf(transform.counts = NULL) 
+
+plot.blossum.abund <- ggplot(df.blossum.abund, aes(Abundance, country, fill=Westernized)) + 
+  geom_boxplot(width = 0.5, outlier.shape = NA, alpha = 0.3) +
+  facet_grid(~Family) +
+  scale_fill_manual("Westernized", values = c( "NO" = "grey50", "YES" = "brown3")) +
+  ylab("Country") +
+  xlab("Abundance (clr)") +
+  theme_minimal()+
+  labs(subtitle = "BloSSUM taxa in Gobal context")
+ggsave("results/supp/global_blossum.pdf", h=5, w=9)
+#plot.blossum.abund
+```
+
+### Check BloSSUM within VEGA  
+
+```{r}
+plot.blossum.abund.NLD.vega <- df.blossum.abund %>% 
+  filter(country=="NLD-VEGA") %>% 
+  ggplot(aes(Abundance, Group,fill=Group)) + 
+  geom_boxplot(width = 0.5, outlier.shape = NA, alpha = 0.3) +
+  facet_grid(~Family) +
+  scale_fill_manual("NLD-VEGA", values=cols_grps) +
+  ylab("Country") +
+  xlab("Abundance (clr)") +
+  theme_minimal() +
+  labs(subtitle = "BloSSUM taxa in NLD-VEGA")
+plot.blossum.abund.NLD.vega
+ggsave("results/supp/vega_blossum.pdf", h=3, w=7)
+
+```
+
+
+## Combine 
+
+```{r fig.height=14, fig.width=14}
+plot.vanish.abund + plot.blossum.abund + 
+  plot_layout(guides = "collect") + 
+  plot_annotation(tag_levels = "a") 
+ggsave("results/supp/Global_VANISH_Blossum.pdf", h=6, w=12)
+
+```
+
+```{r fig.height=8, fig.width=12}
+plot.vanish.abund.NLD.vega / plot.blossum.abund.NLD.vega + 
+  plot_layout(guides = "collect") + 
+  plot_annotation(tag_levels = "a") & theme(legend.position = "none")
+ggsave("results/supp/VEGA_VANISH_Blossum.pdf", h=5, w=8)
+```
+
+
+```{r}
+sessionInfo()
+```
+
+

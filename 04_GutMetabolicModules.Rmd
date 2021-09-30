@@ -1,0 +1,238 @@
+---
+title: "Metagenomics Analysis VEGA project"
+subtitle: "GMM analysis"
+author: "Sudarshan"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: 
+  html_document: 
+    toc: yes
+    toc_depth: 2
+    toc_float: true
+    code_folding: hide  
+editor_options: 
+  chunk_output_type: console
+---
+
+Scale mean of all sample abundance/sample abundance
+
+# Background  
+
+## Load pkgs  
+```{r pkg, message=FALSE, warning=FALSE}
+
+library(vegan)
+library(data.table)
+library(ggpubr)
+library(ggplot2)
+library(microbiome)
+library(microbiomeutilities)
+library(reshape2)
+library(dplyr)
+library(patchwork)
+library(rstatix)
+cols_grps <- c(
+  Omnivore = "#ef476f",
+  Pescatarian = "#f2cc8f",
+  Vegan = "#4ecdc4",
+  Vegetarian = "#1a936f"
+)
+source('codes/customFuns.R')
+
+dir.create("results/metabolic/")
+dir.create("results/metabolic/tab")
+dir.create("results/metabolic/fig")
+```
+
+```{r}
+meta_tab <- as.data.frame(fread("data/metagenome_vega_sample_selection.txt",
+                                header = T, sep = "\t", 
+                                stringsAsFactors = F))
+
+meta_tab$MG_Sample_ID <- gsub("mg_Vega_", "VEGA", meta_tab$MG_Sample_ID)
+rownames(meta_tab) <- meta_tab$MG_Sample_ID
+meta_tab <- meta_tab[, -1]
+colnames(meta_tab)[1] <- "unqiueID"
+meta_tab$sampleID <- rownames(meta_tab)
+dim(meta_tab)
+head(meta_tab)
+meta_tab <- meta_tab %>% 
+  mutate(Group=ifelse(Group== "Meat consumer", "Omnivore", Group))
+```
+
+## Read GMMs  
+```{r}
+gmm.df <- readRDS("data/rds/gmm_tx.rds")
+gmm.df$Taxon <- sub("s__", "", gmm.df$Taxon)
+#head(gmm.df)
+colnames(gmm.df) <- gsub(" ", "_", colnames(gmm.df))
+gmm.df$Level_2 <- gmm.df$Level_3
+
+gmm.df <- gmm.df %>% 
+  mutate(Group=ifelse(Group== "Meat consumer", "Omnivore", Group))
+
+```
+
+```{r}
+comps <- microbiomeutilities::make_pairs(gmm.df$Group)
+```
+
+### Amino acid degradation   
+
+```{r fig.height=10, fig.width=14}
+aad.df <- getFilteredGMM(gmm.df,
+                         filter_level = "Level_1",
+                         for_var = "amino acid degradation")
+
+aad.ab.plot <- plotGMMAbundance(aad.df) + 
+  labs(subtitle = "Amino acid degradation") + 
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank()) 
+aad.sp.plot <- plotTopContributors(aad.df) 
+
+p.aad <- aad.ab.plot / aad.sp.plot + plot_layout(widths = c(2,1))
+p.aad
+ggsave("results/metabolic/fig/amino_acid_species.pdf", h=6, w=6)
+
+```
+
+### Carbohydrate degradation  
+```{r fig.height=10, fig.width=14}
+crb.df <- getFilteredGMM(gmm.df,
+                         filter_level = "Level_1",
+                         for_var = "carbohydrate degradation")
+
+carb.ab.plot <- plotGMMAbundance(crb.df) + 
+  labs(subtitle = "Carbohydrate degradation") + 
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+carb.sp.plot <- plotTopContributors(crb.df) 
+
+#getTopContributors(crb.df, groups_com = unique(crb.df$Group))
+
+p.carb <- carb.ab.plot / carb.sp.plot + plot_layout(widths = c(2,1))
+p.carb
+ggsave("results/metabolic/fig/carbs_species.pdf", h=6, w=6)
+
+```
+
+### Glycoprotein degradation  
+```{r fig.height=10, fig.width=14}
+grpdeg.df <- getFilteredGMM(gmm.df,
+                            filter_level = "Level_1",
+                            for_var = "glycoprotein degradation")
+
+grpdeg.ab.plot <- plotGMMAbundance(grpdeg.df) + 
+  labs(subtitle = "Glycoprotein degradation") + 
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+grpdeg.sp.plot <- plotTopContributors(grpdeg.df) 
+
+p.glyp <- grpdeg.ab.plot / grpdeg.sp.plot + plot_layout(heights = c(1,2))
+p.glyp
+ggsave("results/metabolic/fig/glycoprotein_species.pdf", h=6, w=6)
+
+```
+
+### Lipid degradation  
+```{r fig.height=10, fig.width=14}
+lipid.df <- getFilteredGMM(gmm.df,
+                           filter_level = "Level_1",
+                           for_var = "lipid degradation")
+
+lipid.ab.plot <- plotGMMAbundance(lipid.df) + 
+  labs(subtitle = "Lipid degradation") + 
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+lipid.sp.plot <- plotTopContributors(lipid.df)  
+
+p.lip <- lipid.ab.plot / lipid.sp.plot + plot_layout(heights = c(1,2))
+p.lip
+ggsave("results/metabolic/fig/lipid_species.pdf", h=6, w=6)
+
+```
+
+```{r eval=FALSE}
+
+(aad.ab.plot / aad.sp.plot) + (carb.ab.plot / carb.sp.plot) + plot_layout(widths = c(2,1,4,2)) 
+
+(aad.ab.plot | carb.ab.plot) / (aad.sp.plot | carb.sp.plot)
+
+(p.aad / p.carb) | (p.glyp) / (p.lip)
+```
+
+
+## SCFAs
+
+```{r}
+acetate.metabolism.df <- getFilteredGMM(gmm.df,
+                                        filter_level = "Level_2",
+                                        for_var = "acetate metabolism")
+
+acetate.metabolismd.df.ab.plot <- plotGMMAbundance(acetate.metabolism.df) + 
+  labs(subtitle = "acetate metabolism") + 
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+acetate.metabolism.sp.plot <- plotTopContributors(acetate.metabolism.df, top.bugs=6)
+
+acet.gmm <- acetate.metabolismd.df.ab.plot/acetate.metabolism.sp.plot + plot_layout(heights = c(1,2))
+acet.gmm
+ggsave("results/metabolic/fig/acetate_species.pdf", h=6, w=6)
+
+```
+
+```{r}
+lactate.metabolism.df <- getFilteredGMM(gmm.df,
+                                        filter_level = "Level_2",
+                                        for_var = "lactate metabolism")
+
+lactate.metabolismd.df.ab.plot <- plotGMMAbundance(lactate.metabolism.df) + 
+  labs(subtitle = "lactate metabolism") + 
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+lactate.metabolism.sp.plot <- plotTopContributors(lactate.metabolism.df, top.bugs=6)
+
+lact.gmm <- lactate.metabolismd.df.ab.plot/lactate.metabolism.sp.plot + plot_layout(heights = c(1,2))
+lact.gmm
+ggsave("results/metabolic/fig/lactate_species.pdf", h=6, w=6)
+
+lact.kw <- gmmContributionKWTest(lactate.metabolism.df) %>% filter(p.adj <= 0.05)
+lact.kw
+```
+
+
+```{r}
+propionate.metabolism.df <- getFilteredGMM(gmm.df,
+                                           filter_level = "Level_2",
+                                           for_var = "propionate metabolism")
+
+propionate.metabolismd.df.ab.plot <- plotGMMAbundance(propionate.metabolism.df) + 
+  labs(subtitle = "propionate metabolism") + 
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+propionate.metabolism.sp.plot <- plotTopContributors(propionate.metabolism.df, top.bugs=6)
+
+prop.gmm <- propionate.metabolismd.df.ab.plot/propionate.metabolism.sp.plot + plot_layout(heights = c(1,2))
+prop.gmm
+ggsave("results/metabolic/fig/propionate_species.pdf", h=6, w=6)
+
+```
+
+
+```{r}
+butyrate.metabolism.df <- getFilteredGMM(gmm.df,
+                                         filter_level = "Level_2",
+                                         for_var = "butyrate metabolism")
+
+butyrate.metabolismd.df.ab.plot <- plotGMMAbundance(butyrate.metabolism.df) + 
+  labs(subtitle = "butyrate metabolism") + 
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+butyrate.metabolism.sp.plot <- plotTopContributors(butyrate.metabolism.df, top.bugs=6)
+
+but.gmm <- butyrate.metabolismd.df.ab.plot/butyrate.metabolism.sp.plot + plot_layout(heights = c(1,2))
+but.gmm
+ggsave("results/metabolic/fig/butyrate_species.pdf", h=6, w=6)
+
+```
+
+
