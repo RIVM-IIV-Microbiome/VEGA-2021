@@ -1,0 +1,150 @@
+MG_Sample_ID	Sample_ID	Group	Age_groups	Gender
+mg_Vega_1	VEG 0002	Vegan	less than 35	Female
+mg_Vega_2	VEG 0016	Vegetarian	less than 35	Female
+mg_Vega_3	VEG 0072	Pescatarian	35-55	Male
+mg_Vega_4	VEG 0273	Meat consumer	35-55	Male
+mg_Vega_5	VEG 0007	Vegan	35-55	Female
+mg_Vega_6	VEG 0075	Vegetarian	less than 35	Female
+mg_Vega_7	VEG 0260	Pescatarian	less than 35	Female
+mg_Vega_8	VEG 0276	Meat consumer	35-55	Male
+mg_Vega_9	VEG 0070	Vegan	less than 35	Female
+mg_Vega_10	VEG 0082	Vegetarian	35-55	Female
+mg_Vega_11	VEG 0284	Meat consumer	more than 55	Male
+mg_Vega_12	VEG 0543	Pescatarian	more than 55	Female
+mg_Vega_13	VEG 0085	Vegan	more than 55	Female
+mg_Vega_14	VEG 0156	Vegetarian	35-55	Female
+mg_Vega_15	VEG 0289	Meat consumer	35-55	Female
+mg_Vega_16	VEG 0601	Pescatarian	35-55	Male
+mg_Vega_17	VEG 0098	Vegan	35-55	Male
+mg_Vega_18	VEG 0177	Vegetarian	35-55	Female
+mg_Vega_19	VEG 0291	Meat consumer	more than 55	Male
+mg_Vega_20	VEG 0621	Pescatarian	more than 55	Female
+mg_Vega_21	VEG 0114	Vegan	less than 35	Female
+mg_Vega_22	VEG 0189	Vegetarian	35-55	Male
+mg_Vega_23	VEG 0293	Meat consumer	35-55	Male
+mg_Vega_24	VEG 0634	Pescatarian	less than 35	Female
+mg_Vega_25	VEG 0158	Vegan	less than 35	Female
+mg_Vega_26	VEG 0190	Vegetarian	35-55	Female
+mg_Vega_27	VEG 0294	Meat consumer	more than 55	Female
+mg_Vega_28	VEG 0651	Pescatarian	more than 55	Female
+mg_Vega_29	VEG 0159	Vegan	35-55	Male
+mg_Vega_30	VEG 0199	Vegetarian	35-55	Female
+mg_Vega_31	VEG 0298	Meat consumer	35-55	Male
+mg_Vega_32	VEG 0676	Pescatarian	less than 35	Female
+mg_Vega_33	VEG 0160	Vegan	35-55	Male
+mg_Vega_34	VEG 0224	Vegetarian	more than 55	Female
+mg_Vega_35	VEG 0305	Meat consumer	more than 55	Female
+mg_Vega_36	VEG 0685	Pescatarian	35-55	Male
+mg_Vega_37	VEG 0172	Vegan	more than 55	Female
+mg_Vega_38	VEG 0234	Vegetarian	less than 35	Female
+mg_Vega_39	VEG 0308	Meat consumer	more than 55	Male
+mg_Vega_40	VEG 0695	Pescatarian	more than 55	Male
+mg_Vega_41	VEG 0193	Vegan	35-55	Female
+mg_Vega_42	VEG 0243	Vegetarian	less than 35	Male
+mg_Vega_43	VEG 0315	Meat consumer	35-55	Male
+mg_Vega_44	VEG 0379	Meat consumer	more than 55	Male
+mg_Vega_45	VEG 0738	Pescatarian	more than 55	Female
+mg_Vega_46	VEG 0195	Vegan	less than 35	Female
+mg_Vega_47	VEG 0338	Vegetarian	more than 55	Male
+mg_Vega_48	VEG 0380	Meat consumer	35-55	Male
+mg_Vega_49	VEG 0387	Meat consumer	35-55	Male
+mg_Vega_50	VEG 0756	Pescatarian	more than 55	Female
+mg_Vega_51	VEG 0213	Vegan	more than 55	Female
+mg_Vega_52	VEG 0349	Vegetarian	35-55	Female
+mg_Vega_53	VEG 0393	Meat consumer	more than 55	Female
+mg_Vega_54	VEG 0763	Pescatarian	less than 35	Female
+mg_Vega_55	VEG 0248	Vegan	35-55	Female
+mg_Vega_56	VEG 0486	Vegetarian	less than 35	Male
+mg_Vega_57	VEG 0417	Meat consumer	more than 55	Male
+mg_Vega_58	VEG 0798	Pescatarian	35-55	Male
+mg_Vega_59	VEG 0253	Vegan	35-55	Female
+mg_Vega_60	VEG 0551	Vegetarian	35-55	Female
+mg_Vega_61	VEG 0424	Meat consumer	35-55	Female
+mg_Vega_62	VEG 0428	Meat consumer	more than 55	Female
+mg_Vega_63	VEG 0814	Pescatarian	35-55	Female
+mg_Vega_64	VEG 0270	Vegan	35-55	Male
+mg_Vega_65	VEG 0602	Vegetarian	more than 55	Female
+mg_Vega_66	VEG 0437	Meat consumer	more than 55	Female
+mg_Vega_67	VEG 0848	Pescatarian	35-55	Male
+mg_Vega_68	VEG 0339	Vegan	less than 35	Male
+mg_Vega_69	VEG 0670	Vegetarian	less than 35	Female
+mg_Vega_70	VEG 0444	Meat consumer	35-55	Female
+mg_Vega_71	VEG 0874	Pescatarian	more than 55	Female
+mg_Vega_72	VEG 0465	Vegan	35-55	Male
+mg_Vega_73	VEG 0704	Vegetarian	more than 55	Male
+mg_Vega_74	VEG 0456	Meat consumer	35-55	Female
+mg_Vega_75	VEG 0479	Meat consumer	35-55	Female
+mg_Vega_76	VEG 0891	Pescatarian	35-55	Male
+mg_Vega_77	VEG 0503	Vegan	35-55	Male
+mg_Vega_78	VEG 0792	Vegetarian	35-55	Female
+mg_Vega_79	VEG 0493	Meat consumer	35-55	Female
+mg_Vega_80	VEG 1133	Meat consumer	less than 35	Female
+mg_Vega_81	VEG 0900	Pescatarian	more than 55	Female
+mg_Vega_82	VEG 0524	Vegan	less than 35	Female
+mg_Vega_83	VEG 0794	Vegetarian	35-55	Female
+mg_Vega_84	VEG 1342	Meat consumer	35-55	Female
+mg_Vega_85	VEG 1395	Meat consumer	less than 35	Female
+mg_Vega_86	VEG 0971	Pescatarian	35-55	Female
+mg_Vega_87	VEG 0545	Vegan	more than 55	Female
+mg_Vega_88	VEG 0818	Vegetarian	35-55	Female
+mg_Vega_89	VEG 1398	Meat consumer	35-55	Female
+mg_Vega_90	VEG 1438	Meat consumer	less than 35	Female
+mg_Vega_91	VEG 1052	Pescatarian	less than 35	Female
+mg_Vega_92	VEG 0604	Vegan	more than 55	Male
+mg_Vega_93	VEG 0826	Vegetarian	35-55	Male
+mg_Vega_94	VEG 1452	Meat consumer	less than 35	Male
+mg_Vega_95	VEG 1454	Meat consumer	more than 55	Female
+mg_Vega_96	VEG 1072	Pescatarian	35-55	Female
+mg_Vega_97	VEG 0650	Vegan	35-55	Female
+mg_Vega_98	VEG 0876	Vegetarian	35-55	Male
+mg_Vega_99	VEG 1459	Meat consumer	35-55	Female
+mg_Vega_100	VEG 1467	Meat consumer	less than 35	Male
+mg_Vega_101	VEG 1078	Pescatarian	35-55	Female
+mg_Vega_102	VEG 0683	Vegan	more than 55	Female
+mg_Vega_103	VEG 0948	Vegetarian	35-55	Female
+mg_Vega_104	VEG 1468	Meat consumer	35-55	Female
+mg_Vega_105	VEG 1471	Meat consumer	more than 55	Male
+mg_Vega_106	VEG 1094	Pescatarian	more than 55	Male
+mg_Vega_107	VEG 0748	Vegan	more than 55	Male
+mg_Vega_108	VEG 0959	Vegetarian	more than 55	Female
+mg_Vega_109	VEG 1488	Meat consumer	35-55	Female
+mg_Vega_110	VEG 1492	Meat consumer	35-55	Male
+mg_Vega_111	VEG 1105	Pescatarian	35-55	Female
+mg_Vega_112	VEG 0897	Vegan	less than 35	Male
+mg_Vega_113	VEG 0976	Vegetarian	35-55	Female
+mg_Vega_114	VEG 1498	Meat consumer	more than 55	Female
+mg_Vega_115	VEG 1513	Meat consumer	more than 55	Female
+mg_Vega_116	VEG 1190	Pescatarian	35-55	Female
+mg_Vega_117	VEG 0965	Vegan	less than 35	Female
+mg_Vega_118	VEG 0982	Vegetarian	35-55	Male
+mg_Vega_119	VEG 1524	Meat consumer	35-55	Female
+mg_Vega_120	VEG 1530	Meat consumer	35-55	Female
+mg_Vega_121	VEG 1192	Pescatarian	more than 55	Male
+mg_Vega_122	VEG 1046	Vegan	less than 35	Female
+mg_Vega_123	VEG 1004	Vegetarian	more than 55	Female
+mg_Vega_124	VEG 1533	Meat consumer	less than 35	Female
+mg_Vega_125	VEG 1549	Meat consumer	35-55	Female
+mg_Vega_126	VEG 1194	Pescatarian	more than 55	Female
+mg_Vega_127	VEG 1086	Vegan	35-55	Female
+mg_Vega_128	VEG 1008	Vegetarian	more than 55	Female
+mg_Vega_129	VEG 1562	Meat consumer	35-55	Female
+mg_Vega_130	VEG 1568	Meat consumer	35-55	Female
+mg_Vega_131	VEG 1276	Pescatarian	35-55	Male
+mg_Vega_132	VEG 1203	Vegan	less than 35	Female
+mg_Vega_133	VEG 1091	Vegetarian	35-55	Male
+mg_Vega_134	VEG 1580	Meat consumer	less than 35	Female
+mg_Vega_135	VEG 1598	Meat consumer	more than 55	Female
+mg_Vega_136	VEG 1298	Pescatarian	less than 35	Male
+mg_Vega_137	VEG 1245	Vegan	35-55	Female
+mg_Vega_138	VEG 1151	Vegetarian	more than 55	Female
+mg_Vega_139	VEG 1604	Meat consumer	less than 35	Female
+mg_Vega_140	VEG 1608	Meat consumer	less than 35	Female
+mg_Vega_141	VEG 1329	Pescatarian	less than 35	Female
+mg_Vega_142	VEG 1341	Vegan	35-55	Male
+mg_Vega_143	VEG 1198	Vegetarian	less than 35	Male
+mg_Vega_144	VEG 1638	Meat consumer	less than 35	Female
+mg_Vega_145	VEG 1339	Pescatarian	more than 55	Male
+mg_Vega_146	VEG 1302	Vegetarian	more than 55	Male
+mg_Vega_147	VEG 1646	Meat consumer	35-55	Female
+mg_Vega_148	VEG 1636	Pescatarian	less than 35	Female
+mg_Vega_149	VEG 1641	Vegetarian	less than 35	Female
