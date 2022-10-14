@@ -20,16 +20,18 @@ Scale mean of all sample abundance/sample abundance
 ## Load pkgs  
 ```{r pkg, message=FALSE, warning=FALSE}
 
-library(vegan)
-library(data.table)
-library(ggpubr)
-library(ggplot2)
-library(microbiome)
-library(microbiomeutilities)
-library(reshape2)
-library(dplyr)
-library(patchwork)
-library(rstatix)
+suppressPackageStartupMessages({
+  library(vegan)
+  library(data.table)
+  library(ggpubr)
+  library(ggplot2)
+  library(microbiome)
+  library(microbiomeutilities)
+  library(reshape2)
+  library(dplyr)
+  library(patchwork)
+  library(rstatix)
+})
 cols_grps <- c(
   Omnivore = "#ef476f",
   Pescatarian = "#f2cc8f",
@@ -95,6 +97,7 @@ ggsave("results/metabolic/fig/amino_acid_species.pdf", h=6, w=6)
 
 ```
 
+
 ### Carbohydrate degradation  
 ```{r fig.height=10, fig.width=14}
 crb.df <- getFilteredGMM(gmm.df,
@@ -132,6 +135,7 @@ p.glyp
 ggsave("results/metabolic/fig/glycoprotein_species.pdf", h=6, w=6)
 
 ```
+
 
 ### Lipid degradation  
 ```{r fig.height=10, fig.width=14}
@@ -192,11 +196,10 @@ lactate.metabolismd.df.ab.plot <- plotGMMAbundance(lactate.metabolism.df) +
 lactate.metabolism.sp.plot <- plotTopContributors(lactate.metabolism.df, top.bugs=6)
 
 lact.gmm <- lactate.metabolismd.df.ab.plot/lactate.metabolism.sp.plot + plot_layout(heights = c(1,2))
-lact.gmm
+lact.gmm[[1]] + theme(legend.position = "top")
+ggsave("results/metabolic/fig/legend.pdf", h=6, w=8)
 ggsave("results/metabolic/fig/lactate_species.pdf", h=6, w=6)
 
-lact.kw <- gmmContributionKWTest(lactate.metabolism.df) %>% filter(p.adj <= 0.05)
-lact.kw
 ```
 
 
@@ -234,5 +237,135 @@ but.gmm
 ggsave("results/metabolic/fig/butyrate_species.pdf", h=6, w=6)
 
 ```
+
+# Reviewer  
+
+```{r}
+(aad.ab.plot + carb.ab.plot) / (grpdeg.ab.plot + lipid.ab.plot) + plot_annotation(tag_levels = "a")
+ggsave("results/metabolic/fig/GMM_level_1.pdf", h=5, w=9)
+
+(acetate.metabolismd.df.ab.plot + lactate.metabolismd.df.ab.plot) / 
+  (propionate.metabolismd.df.ab.plot + butyrate.metabolismd.df.ab.plot) + plot_annotation(tag_levels = "a")
+ggsave("results/metabolic/fig/GMM_level_2.pdf", h=5, w=9)
+
+p.l1 <- (aad.ab.plot + carb.ab.plot) / (grpdeg.ab.plot + lipid.ab.plot) + plot_annotation(tag_levels = "a")
+p.l2 <- (acetate.metabolismd.df.ab.plot + lactate.metabolismd.df.ab.plot) / 
+  (propionate.metabolismd.df.ab.plot + butyrate.metabolismd.df.ab.plot) + plot_annotation(tag_levels = "a")
+
+
+ggsave("results/metabolic/fig/GMM_level_1n2.pdf", h=9, w=12)
+```
+
+
+## Significant contributors  
+```{r}
+plotSigTaxa <- function(df,
+                        abund_cutoff = 0,
+                        prevalence.cutoff = 5/100,
+                        fdr.method = "BH"){
+ 
+  wide.df <- df %>% 
+    pivot_wider(names_from = variable, id_cols = Taxon, values_from = abundance) %>% 
+    as.data.frame() %>% 
+    column_to_rownames("Taxon")
+  keep <- core_members(wide.df, abund_cutoff, prevalence.cutoff) 
+  df <- df %>% filter(Taxon %in% keep)
+  
+  sdh <- df %>%
+    left_join(meta_tab, by= c("variable" ="sampleID")) %>% 
+    group_by(Group.x, variable) %>% 
+    mutate(frequency = abundance / sum(abundance)) %>% 
+    mutate(frequency = frequency*100) %>% 
+    ungroup()
+  
+  sdh.test <- sdh %>% 
+    group_by(Taxon) %>% 
+    kruskal_test(frequency ~ Group.x) %>%
+    adjust_pvalue(method = fdr.method) %>%
+    add_significance("p.adj")
+  
+  # sdh.test |> 
+  #   filter(p.adj <= 0.05)
+  
+  dun.test <- sdh %>% 
+    group_by(Taxon) %>% 
+    dunn_test(frequency ~ Group.x) %>%
+    adjust_pvalue(method = fdr.method) %>%
+    add_significance("p.adj")  
+  
+  sig.dat <- dun.test |> 
+    mutate(comparison = paste0(group1, " vs ", group2)) |> 
+    mutate(diff = ifelse(p.adj < 0.05, "+", "-"))
+  
+  p1 <- sig.dat |> 
+    filter(p.adj < 0.05) |> 
+    filter(Taxon !="unclassified") |>
+    mutate(SigDif = "Different") |> 
+    ggplot(aes(y= as.factor(Taxon), x= comparison)) +
+    geom_tile(aes(fill=diff), color="grey90", show.legend = FALSE)+
+    scale_fill_manual(values = "brown3") +
+    theme_vega()+
+    rotate_x_text(angle = 45)+
+    facet_grid(~SigDif, scales = "free_x")+
+    theme(axis.title = element_blank(),
+          axis.text.y = element_text(face = "italic")) 
+  
+  sig.tax <- dun.test |> 
+    filter(p.adj < 0.05)
+  sdh.sig.tax <- sdh |> 
+    filter(Taxon %in% unique(sig.tax$Taxon))
+  #sdh.sig.tax
+  
+  p2 <- sdh.sig.tax |> 
+    filter(Taxon !="unclassified") |>
+    ggplot(aes(x = variable, y = as.factor(Taxon))) +
+    geom_tile(aes(fill= log10(frequency+1))) +
+    scale_fill_gradientn("Relative \ncontribution (log10)",
+                         colours = c("#f8fafd", "#1d3557"),
+                         #trans = "log10",
+                         na.value = "white") +
+    theme_vega() +
+    rotate_x_text(angle = 45) +
+    facet_grid(~Group.x, scales = "free_x")+
+    theme(axis.title = element_blank(),
+          panel.grid.major =  element_blank(),
+          strip.background = element_rect(color="grey70"),
+          axis.text.y = element_blank(),
+          axis.text.x = element_blank()) 
+  
+  return((p1 + p2) + plot_layout(widths = c(0.3,1)))
+}
+```
+
+## Level 1  
+```{r}
+p.aa <- plotSigTaxa(aad.df) + labs(subtitle = "amino acid degradation")
+p.cb <- plotSigTaxa(crb.df) + labs(subtitle = "carbohydrate degradation")
+p.gp <- plotSigTaxa(grpdeg.df)+ labs(subtitle = "glycoprotein degradation")
+p.lp <- plotSigTaxa(lipid.df)+ labs(subtitle = "lipid degradation")
+(p.aa / p.cb /p.gp) + plot_layout(heights = c(0.8,0.8,0.4)) + plot_annotation(tag_levels = "a")
+ggsave("results/metabolic/fig/GMM_Taxa_level_1.pdf", h=8, w=12)
+```
+
+## Level 2  
+```{r}
+p.ace <- plotSigTaxa(acetate.metabolism.df)+ labs(subtitle = "acetate metabolism")
+p.lac <- plotSigTaxa(lactate.metabolism.df)+ labs(subtitle = "lactate metabolism")
+p.pro <- plotSigTaxa(propionate.metabolism.df)+ labs(subtitle = "propionate metabolism")
+p.but <- plotSigTaxa(butyrate.metabolism.df)+ labs(subtitle = "butyrate metabolism")
+
+(p.ace / p.lac /p.pro) + plot_layout(heights = c(0.5,1,0.8)) + plot_annotation(tag_levels = "a")
+ggsave("results/metabolic/fig/GMM_Taxa_level_2.pdf", h=7, w=11)
+
+```
+
+```{r}
+sessionInfo()
+```
+
+
+
+
+
 
 

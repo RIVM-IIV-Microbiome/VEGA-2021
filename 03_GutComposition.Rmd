@@ -23,15 +23,19 @@ What is the composition of VEGA cohort compared to other populations across the 
 
 ## Load pkgs  
 ```{r message=FALSE, warning=FALSE}
-library(microbiomeutilities) # from GitHub
-library(dplyr)
-library(stringr)
-library(biomeUtils) # from GitHub
-library(reshape2)
-library(tibble)
-library(patchwork)
-library(readr)
-library(ggvenn)
+suppressPackageStartupMessages({
+  library(microbiomeutilities) # from GitHub
+  library(dplyr)
+  library(stringr)
+  library(biomeUtils) # from GitHub
+  library(reshape2)
+  library(tibble)
+  library(patchwork)
+  library(readr)
+  library(ggvenn)
+  library(vegan)
+  library(ecodist)
+})
 
 # Some custom functions
 source('codes/customFuns.R')
@@ -131,6 +135,11 @@ taxa_names(mpa.reabund.ps) <- gsub("_", " ", taxa_names(mpa.reabund.ps))
 
 ```
 
+```{r}
+getSampleTibble(pseq.curateddb) |> dplyr::count(non_westernized)
+```
+
+
 *How many species are common to global and vega samples?*  
 ```{r}
 table(taxa_names(pseq.curateddb) %in% taxa_names(mpa.reabund.ps))
@@ -160,13 +169,13 @@ Two Collinsella species, C. stercoris   [Collinsella] massiliensis are highly pr
 ```{r}
 #head(meta(pseq.curateddb))
 #getAbundanceTibble(pseq.curateddb)$SID01.BA.VG.2[125:150]
-
+meta(mpa.reabund.ps)
 mpa.reabund.ps <- mutateSampleData(mpa.reabund.ps, 
                                    study_name = "VEGA",
                                    disease = "healthy", 
                                    country = "NLD-VEGA",
                                    non_westernized = "no",
-                                   subject_id =  MG_Sample_ID,
+                                   #subject_id =  MG_Sample_ID,
                                    Group = ifelse(Group== "Meat consumer", "Omnivore", Group))
 
 ps.merge <- merge_phyloseq(pseq.curateddb, mpa.reabund.ps)
@@ -191,9 +200,15 @@ euclidean_dist <- vegan::vegdist(mgs.clr, method = "euclidean")
 
 # takes time so save this output
 saveRDS(euclidean_dist, "data/rds/euclidean_dist.rds")
+euclidean_dist <- readRDS("data/rds/euclidean_dist.rds")
 
 # Does principal coordinate analysis
 euclidean_pcoa <- ecodist::pco(euclidean_dist)
+#euclidean_pcoa$values
+
+evals1 <- round(eigenvals(euclidean_pcoa)[1] / sum(eigenvals(euclidean_pcoa)) * 100, 2)
+evals2 <- round(eigenvals(euclidean_pcoa)[2] / sum(eigenvals(euclidean_pcoa)) * 100, 2)
+
 
 sample.meta <- getSampleTibble(ps.merge, column_id = "SampleID")
 
@@ -215,8 +230,8 @@ euclidean_plot <- ggplot(data = euclidean_pcoa_df,
   geom_vline(xintercept = 0,color="grey80") +
   geom_point(aes(color=Westernized), alpha=0.3, size=1) +
   theme_minimal() + 
-  labs(x = "Coordinate 1",
-       y = "Coordinate 2",
+  labs(x = paste0("PCo 1 ", "(" ,evals1 , "%)"),
+       y = paste0("PCo 2 ", "(" ,evals2 , "%)")
        #title = "Western and Non-Western Microbiomes"
        ) +
   #theme(title = element_text(size = 12)) + # makes titles smaller +
@@ -230,13 +245,11 @@ euclidean_plot_NLD <- euclidean_pcoa_df %>%
   ggplot(aes(x=pcoa1, y=pcoa2)) +
   geom_hline(yintercept = 0, color="grey80")+
   geom_vline(xintercept = 0,color="grey80") + 
-  #geom_density_2d_filled(alpha = 0.5)
-  #geom_density_2d() +
   geom_point(aes(color=Country_2), alpha=0.3, size=1) +
   theme_minimal() + 
-  labs(x = "Coordinate 1",
-       y = "Coordinate 2",
-       #title = "LifeLines and VEGA Gut Microbiomes in Global Context"
+  labs(x = paste0("PCo 1 ", "(" ,evals1 , "%)"),
+       y = paste0("PCo 2 ", "(" ,evals2 , "%)")
+       #title = "Western and Non-Western Microbiomes"
        ) +
   #theme(title = element_text(size = 12)) + # makes titles smaller +
   scale_color_manual("Country", values = c('NLD-VEGA' = "#EFC000FF", 'NLD-LifeLines'="#0073C2FF", Other = "grey30")) 
@@ -249,6 +262,7 @@ Compare similarity to other human gut metagenomes.
 ```{r}
 
 bray_dist <- vegan::vegdist(t(abundances(ps.merge)), method = "bray")
+saveRDS(bray_dist, "data/rds/bray_dist.rds")
 
 bray_dist_tib <- (1-bray_dist) %>% 
   as.matrix() %>% 
@@ -285,6 +299,52 @@ bc.plot <- vega_dist_to_others %>%
   coord_flip()
 ggsave("results/composition/fig/distance_to_countires.pdf", h=5, w=4)
 ```
+
+```{r}
+dist.to.westernized <- bray_dist_tib %>% 
+  dplyr::filter(country_S2=="NLD-VEGA") %>% 
+  dplyr::filter(Westernized_S1 == "YES") |>
+  dplyr::group_by(S2) %>% 
+  dplyr::summarise(mean.dist=mean(value, na.rm = TRUE)) |> 
+  mutate(similarity="Westernized")
+
+dist.to.non.westernized <- bray_dist_tib %>% 
+  dplyr::filter(country_S2=="NLD-VEGA") %>% 
+  dplyr::filter(Westernized_S1 == "NO") |>
+  dplyr::group_by(S2) %>% 
+  dplyr::summarise(mean.dist=mean(value, na.rm = TRUE)) |> 
+  mutate(similarity="Non-Westernized")
+
+dist.to.all <- bind_rows(dist.to.westernized,dist.to.non.westernized) 
+dist.to.all |> 
+  rstatix::wilcox_test(mean.dist ~ similarity, p.adjust.method = "BH")
+
+p.dist <- dist.to.all |> 
+  ggplot(aes(similarity,mean.dist)) +
+    geom_boxplot(alpha=0.5,
+                 width = .15,
+                 outlier.shape = NA) +
+    ggdist::stat_halfeye(
+      aes(x = similarity, fill = similarity), 
+      color = "black", size=0.8) +
+    # scale_color_manual(xvar,values = fill.col) +
+    # scale_fill_manual(xvar, values = fill.col) +
+    labs(y="Mean similarity (1-BC) \nNLD-VEGA", x="")+
+  theme_vega() +
+  ggpubr::stat_compare_means(p.adjust.method ="BH") +
+  scale_fill_manual("Country", values = c("Non-Westernized" = "grey50",
+                                          "Westernized" = "brown3"))+
+  theme(legend.position = "none") +
+    theme(axis.title.x = element_blank())
+ggsave("results/composition/fig/distance_to_westernized.pdf", h=3, w=5)
+```
+
+```{r}
+getSampleTibble(ps.merge) |> 
+  filter(country !="NLD-VEGA") |> 
+  count(non_westernized)
+```
+
 
 # Core species in Dutch populations    
 
@@ -546,12 +606,12 @@ ggsave("results/composition/fig/01-Fig-01.pdf", h=6, w=8)
 
 p1 <- (euclidean_plot + euclidean_plot_NLD)
 
-p2 <- (bc.plot | common.core.heatmap) / (firm.bac.plot + bac.prev.plot) + plot_layout(heights = c(1,0.5))
+p2 <- (p.dist | plot_spacer()) / (firm.bac.plot + bac.prev.plot) + plot_layout(heights = c(1,0.5))
 
 p1 / p2 + 
   plot_layout(heights = c(1,2), guides = "collect") +
   plot_annotation(tag_levels = "a")
-ggsave("results/composition/fig/01-Fig-01.pdf", h=10, w=10)
+ggsave("results/composition/fig/01-Fig-01-R1.pdf", h=10, w=10)
 
 ```
 
